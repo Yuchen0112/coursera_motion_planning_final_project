@@ -7,6 +7,10 @@
 # Additional Comments: Carlos Wang
 # Date: October 29, 2018
 
+# Modified by: Yuchen Liu
+# Final Project of Coursera Motion Planning for Self-Driving Cars
+# Date: February 12, 2021
+
 import numpy as np
 import copy
 import path_optimizer
@@ -14,9 +18,10 @@ import collision_checker
 import velocity_planner
 from math import sin, cos, pi, sqrt
 
+
 class LocalPlanner:
-    def __init__(self, num_paths, path_offset, circle_offsets, circle_radii, 
-                 path_select_weight, time_gap, a_max, slow_speed, 
+    def __init__(self, num_paths, path_offset, circle_offsets, circle_radii,
+                 path_select_weight, time_gap, a_max, slow_speed,
                  stop_line_buffer):
         self._num_paths = num_paths
         self._path_offset = path_offset
@@ -26,7 +31,7 @@ class LocalPlanner:
                                                circle_radii,
                                                path_select_weight)
         self._velocity_planner = \
-            velocity_planner.VelocityPlanner(time_gap, a_max, slow_speed, 
+            velocity_planner.VelocityPlanner(time_gap, a_max, slow_speed,
                                              stop_line_buffer)
 
     ######################################################
@@ -87,12 +92,13 @@ class LocalPlanner:
         # consecutive waypoints, then use the np.arctan2() function.
         # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
         # ------------------------------------------------------------------
-        # if ...
-        # delta_x = ...
-        # delta_y = ...
-        # else: ...
-        # ...
-        # heading = ...
+        if goal_index == len(waypoints) - 1:
+            delta_x = waypoints[goal_index][0] - waypoints[goal_index - 1][0]
+            delta_y = waypoints[goal_index][1] - waypoints[goal_index - 1][1]
+        else:
+            delta_x = waypoints[goal_index + 1][0] - waypoints[goal_index][0]
+            delta_y = waypoints[goal_index + 1][1] - waypoints[goal_index][1]
+        heading = np.arctan2(delta_y, delta_x)
         # ------------------------------------------------------------------
 
         # Compute the center goal state in the local frame using 
@@ -105,8 +111,8 @@ class LocalPlanner:
         # This is done by subtracting the ego_state from the goal_state_local.
         # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
         # ------------------------------------------------------------------
-        # goal_state_local[0] -= ... 
-        # goal_state_local[1] -= ... 
+        goal_state_local[0] -= ego_state[0]
+        goal_state_local[1] -= ego_state[1]
         # ------------------------------------------------------------------
 
         # Rotate such that the ego state has zero heading in the new frame.
@@ -116,15 +122,15 @@ class LocalPlanner:
         # current yaw corresponds to theta = 0 in the new local frame.
         # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
         # ------------------------------------------------------------------
-        # goal_x = ...
-        # goal_y = ...
+        goal_x = goal_state_local[0] * np.cos(-ego_state[2]) - goal_state_local[1] * np.sin(-ego_state[2])
+        goal_y = goal_state_local[0] * np.sin(-ego_state[2]) + goal_state_local[1] * np.cos(-ego_state[2])
         # ------------------------------------------------------------------
 
         # Compute the goal yaw in the local frame by subtracting off the 
         # current ego yaw from the heading variable.
         # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
         # ------------------------------------------------------------------
-        # goal_t = ...
+        goal_t = heading - ego_state[2]
         # ------------------------------------------------------------------
 
         # Velocity is preserved after the transformation.
@@ -132,9 +138,9 @@ class LocalPlanner:
 
         # Keep the goal heading within [-pi, pi] so the optimizer behaves well.
         if goal_t > pi:
-            goal_t -= 2*pi
+            goal_t -= 2 * pi
         elif goal_t < -pi:
-            goal_t += 2*pi
+            goal_t += 2 * pi
 
         # Compute and apply the offset for each path such that
         # all of the paths have the same heading of the goal state, 
@@ -151,17 +157,17 @@ class LocalPlanner:
             # and sin(goal_theta + pi/2), respectively.
             # TODO: INSERT YOUR CODE BETWEEN THE DASHED LINES
             # ------------------------------------------------------------------
-            # x_offset = ...
-            # y_offset = ...
+            x_offset = offset * np.cos(goal_t + np.pi / 2.)
+            y_offset = offset * np.sin(goal_t + np.pi / 2.)
             # ------------------------------------------------------------------
 
-            goal_state_set.append([goal_x + x_offset, 
-                                   goal_y + y_offset, 
-                                   goal_t, 
+            goal_state_set.append([goal_x + x_offset,
+                                   goal_y + y_offset,
+                                   goal_t,
                                    goal_v])
-           
-        return goal_state_set  
-              
+
+        return goal_state_set
+
     # Plans the path set using polynomial spiral optimization to
     # each of the goal states.
     def plan_paths(self, goal_state_set):
@@ -198,14 +204,14 @@ class LocalPlanner:
                 (true) or not (false) for the local planner to traverse. Each ith
                 path_validity corresponds to the ith path in the path list.
         """
-        paths         = []
+        paths = []
         path_validity = []
         for goal_state in goal_state_set:
-            path = self._path_optimizer.optimize_spiral(goal_state[0], 
-                                                        goal_state[1], 
+            path = self._path_optimizer.optimize_spiral(goal_state[0],
+                                                        goal_state[1],
                                                         goal_state[2])
-            if np.linalg.norm([path[0][-1] - goal_state[0], 
-                               path[1][-1] - goal_state[1], 
+            if np.linalg.norm([path[0][-1] - goal_state[0],
+                               path[1][-1] - goal_state[1],
                                path[2][-1] - goal_state[2]]) > 0.1:
                 path_validity.append(False)
             else:
@@ -213,6 +219,7 @@ class LocalPlanner:
                 path_validity.append(True)
 
         return paths, path_validity
+
 
 def transform_paths(paths, ego_state):
     """ Converts the to the global coordinate frame.
@@ -252,10 +259,10 @@ def transform_paths(paths, ego_state):
         t_transformed = []
 
         for i in range(len(path[0])):
-            x_transformed.append(ego_state[0] + path[0][i]*cos(ego_state[2]) - \
-                                                path[1][i]*sin(ego_state[2]))
-            y_transformed.append(ego_state[1] + path[0][i]*sin(ego_state[2]) + \
-                                                path[1][i]*cos(ego_state[2]))
+            x_transformed.append(ego_state[0] + path[0][i] * cos(ego_state[2]) - \
+                                 path[1][i] * sin(ego_state[2]))
+            y_transformed.append(ego_state[1] + path[0][i] * sin(ego_state[2]) + \
+                                 path[1][i] * cos(ego_state[2]))
             t_transformed.append(path[2][i] + ego_state[2])
 
         transformed_paths.append([x_transformed, y_transformed, t_transformed])
